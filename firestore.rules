@@ -1,0 +1,112 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: /users/{uid}
+    // Fields: uid, businessName, logoUrl, phone, whatsapp, address, currency, invoicePrefix, language, theme
+    //
+    // Collection: /customers
+    // Fields: id, ownerUid, name, phone, whatsapp, address, notes, isVip, totalOrders, unpaidBalance, lastOrderDate, favoriteItems
+    //
+    // Collection: /orders
+    // Fields: id, orderNumber, ownerUid, customerId, customerName, date, items[], subtotal, discount, deliveryCharges, tax, total, advancePaid, balance, paymentMethod, paymentStatus, deliveryStatus, notes
+    //
+    // Collection: /offers
+    // Fields: id, ownerUid, title, description, discountCode, imageUrl, expiryDate
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.ownerUid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "gbbhi6914@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'businessName']) &&
+             data.uid == request.auth.uid &&
+             data.businessName is string && data.businessName.size() > 0 && data.businessName.size() < 100;
+    }
+
+    function isValidCustomer(data) {
+      return hasRequiredFields(['ownerUid', 'name', 'phone']) &&
+             data.ownerUid == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.phone is string && data.phone.size() > 0 && data.phone.size() < 20;
+    }
+
+    function isValidOrder(data) {
+      return hasRequiredFields(['ownerUid', 'customerId', 'orderNumber', 'total']) &&
+             data.ownerUid == request.auth.uid &&
+             data.orderNumber is string &&
+             data.total is number && data.total >= 0;
+    }
+
+    function isValidOffer(data) {
+      return hasRequiredFields(['ownerUid', 'title']) &&
+             data.ownerUid == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && isValidUser(request.resource.data);
+      allow update: if isOwner(uid) && isValidUser(request.resource.data);
+    }
+
+    match /customers/{customerId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
+      allow create: if isAuthenticated() && isValidCustomer(request.resource.data);
+      allow update: if isDocOwner() && isValidCustomer(request.resource.data);
+      allow delete: if isDocOwner();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
+      allow create: if isAuthenticated() && isValidOrder(request.resource.data);
+      allow update: if isDocOwner() && isValidOrder(request.resource.data);
+      allow delete: if isDocOwner();
+    }
+
+    match /offers/{offerId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
+      allow create: if isAuthenticated() && isValidOffer(request.resource.data);
+      allow update: if isDocOwner() && isValidOffer(request.resource.data);
+      allow delete: if isDocOwner();
+    }
+  }
+}

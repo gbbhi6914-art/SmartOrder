@@ -1,0 +1,111 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Business owner profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "businessName": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "address": { "type": "string" },
+        "currency": { "type": "string", "enum": ["PKR", "USD", "INR", "AED"] },
+        "invoicePrefix": { "type": "string" },
+        "language": { "type": "string", "enum": ["en", "ur"] },
+        "theme": { "type": "string", "enum": ["light", "dark"] }
+      },
+      "required": ["uid", "businessName"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "address": { "type": "string" },
+        "notes": { "type": "string" },
+        "isVip": { "type": "boolean" },
+        "totalOrders": { "type": "number" },
+        "unpaidBalance": { "type": "number" },
+        "lastOrderDate": { "type": "string", "format": "date-time" },
+        "favoriteItems": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["ownerUid", "name", "phone"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Order details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "quantity": { "type": "number" },
+              "price": { "type": "number" }
+            }
+          }
+        },
+        "subtotal": { "type": "number" },
+        "discount": { "type": "number" },
+        "deliveryCharges": { "type": "number" },
+        "tax": { "type": "number" },
+        "total": { "type": "number" },
+        "advancePaid": { "type": "number" },
+        "balance": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "Bank Transfer", "JazzCash", "EasyPaisa", "Card"] },
+        "paymentStatus": { "type": "string", "enum": ["Paid", "Partial", "Unpaid"] },
+        "deliveryStatus": { "type": "string", "enum": ["Pending", "Ready", "Delivered", "Cancelled"] },
+        "notes": { "type": "string" }
+      },
+      "required": ["ownerUid", "customerId", "orderNumber", "total"]
+    },
+    "Offer": {
+      "title": "Offer",
+      "description": "Promotional offers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "discountCode": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "expiryDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "title"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "Business owner profiles"
+    },
+    "/customers": {
+      "schema": "Customer",
+      "description": "Customer records"
+    },
+    "/orders": {
+      "schema": "Order",
+      "description": "Order records"
+    },
+    "/offers": {
+      "schema": "Offer",
+      "description": "Promotional offers"
+    }
+  }
+}
