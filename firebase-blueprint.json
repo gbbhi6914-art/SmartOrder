@@ -88,6 +88,22 @@
         "expiryDate": { "type": "string", "format": "date-time" }
       },
       "required": ["ownerUid", "title"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notifications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "isRead": { "type": "boolean" },
+        "type": { "type": "string", "enum": ["order", "payment", "system"] },
+        "orderId": { "type": "string" }
+      },
+      "required": ["ownerUid", "title", "message", "date", "isRead", "type"]
     }
   },
   "firestore": {
@@ -106,6 +122,10 @@
     "/offers": {
       "schema": "Offer",
       "description": "Promotional offers"
+    },
+    "/notifications": {
+      "schema": "Notification",
+      "description": "User notifications"
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Order, UserProfile } from '../types';
+import { Order, UserProfile, Customer } from '../types';
 import { 
   FileText, 
   Search, 
@@ -16,14 +16,23 @@ import {
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import InvoiceModal from './InvoiceModal';
 
 interface InvoicesProps {
   orders: Order[];
+  customers: Customer[];
   profile: UserProfile | null;
 }
 
-export default function Invoices({ orders, profile }: InvoicesProps) {
+export default function Invoices({ orders, customers, profile }: InvoicesProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+
+  const selectedCustomer = useMemo(() => {
+    if (!selectedOrder) return null;
+    return customers.find(c => c.id === selectedOrder.customerId) || null;
+  }, [selectedOrder, customers]);
 
   const filteredInvoices = useMemo(() => {
     return orders.filter(o => 
@@ -116,7 +125,13 @@ export default function Invoices({ orders, profile }: InvoicesProps) {
                   <MessageSquare className="w-4 h-4" />
                   WhatsApp
                 </button>
-                <button className="bg-primary-light dark:bg-primary-shadow text-primary dark:text-primary-light p-3 rounded-xl hover:bg-primary-light dark:hover:bg-primary-shadow transition-colors flex items-center justify-center gap-2 font-bold text-sm">
+                <button 
+                  onClick={() => {
+                    setSelectedOrder(order);
+                    setIsInvoiceModalOpen(true);
+                  }}
+                  className="bg-primary-light dark:bg-primary-shadow text-primary dark:text-primary-light p-3 rounded-xl hover:bg-primary-light dark:hover:bg-primary-shadow transition-colors flex items-center justify-center gap-2 font-bold text-sm"
+                >
                   <Eye className="w-4 h-4" />
                   Preview
                 </button>
@@ -140,6 +155,14 @@ export default function Invoices({ orders, profile }: InvoicesProps) {
           </div>
         )}
       </div>
+
+      <InvoiceModal 
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        order={selectedOrder}
+        customer={selectedCustomer}
+        profile={profile}
+      />
     </div>
   );
 }

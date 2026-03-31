@@ -69,3 +69,14 @@ export interface Offer {
 }
 
 export type Tab = 'dashboard' | 'orders' | 'customers' | 'invoices' | 'settings' | 'offers';
+
+export interface Notification {
+  id: string;
+  ownerUid: string;
+  title: string;
+  message: string;
+  date: string;
+  isRead: boolean;
+  type: 'order' | 'payment' | 'system';
+  orderId?: string;
+}

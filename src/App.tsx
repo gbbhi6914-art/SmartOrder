@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   auth, 
   db, 
@@ -11,6 +11,9 @@ import {
   signInWithPopup, 
   signOut, 
   onAuthStateChanged, 
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
   doc, 
   getDoc, 
   setDoc, 
@@ -26,7 +29,7 @@ import {
   OperationType,
   handleFirestoreError
 } from './firebase';
-import { UserProfile, Customer, Order, Tab } from './types';
+import { UserProfile, Customer, Order, Tab, Notification } from './types';
 import { 
   LayoutDashboard, 
   ShoppingBag, 
@@ -51,6 +54,7 @@ import SettingsView from './components/Settings';
 import Offers from './components/Offers';
 import NewOrderModal from './components/NewOrderModal';
 import AddCustomerModal from './components/AddCustomerModal';
+import NotificationPanel from './components/NotificationPanel';
 
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -59,9 +63,18 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
+  // Auth State
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [businessNameInput, setBusinessNameInput] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  
   // Data State
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   
   // Modals
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
@@ -69,6 +82,7 @@ export default function App() {
   const [editOrderData, setEditOrderData] = useState<Order | null>(null);
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [editCustomerData, setEditCustomerData] = useState<Customer | null>(null);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -124,6 +138,12 @@ export default function App() {
       orderBy('date', 'desc')
     );
 
+    const notificationsQuery = query(
+      collection(db, 'notifications'),
+      where('ownerUid', '==', user.uid),
+      orderBy('date', 'desc')
+    );
+
     const unsubCustomers = onSnapshot(customersQuery, (snapshot) => {
       setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'customers'));
@@ -132,17 +152,47 @@ export default function App() {
       setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
 
+    const unsubNotifications = onSnapshot(notificationsQuery, (snapshot) => {
+      setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'notifications'));
+
     return () => {
       unsubCustomers();
       unsubOrders();
+      unsubNotifications();
     };
   }, [user]);
 
   const handleLogin = async () => {
+    setAuthLoading(true);
+    setAuthError('');
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
+      setAuthError(error.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      if (authMode === 'signup') {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(userCredential.user, { displayName: businessNameInput });
+        // Profile will be created by the onAuthStateChanged effect
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (error: any) {
+      console.error("Auth error:", error);
+      setAuthError(error.message);
+    } finally {
+      setAuthLoading(false);
     }
   };
 
@@ -189,6 +239,47 @@ export default function App() {
     }
   };
 
+  const handleOpenNotifications = async () => {
+    setIsNotificationOpen(true);
+    // Mark all unread as read when opening the panel
+    const unread = notifications.filter(n => !n.isRead);
+    if (unread.length > 0) {
+      try {
+        const promises = unread.map(n => updateDoc(doc(db, 'notifications', n.id), { isRead: true }));
+        await Promise.all(promises);
+      } catch (error) {
+        console.error("Error marking all as read:", error);
+      }
+    }
+  };
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'notifications', id), { isRead: true });
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
+  };
+
+  const handleDeleteNotification = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'notifications', id));
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+    }
+  };
+
+  const handleClearAllNotifications = async () => {
+    try {
+      const promises = notifications.map(n => deleteDoc(doc(db, 'notifications', n.id)));
+      await Promise.all(promises);
+    } catch (error) {
+      console.error("Error clearing notifications:", error);
+    }
+  };
+
+  const unreadNotificationsCount = notifications.filter(n => !n.isRead).length;
+
   useEffect(() => {
     if (profile?.theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -218,36 +309,100 @@ export default function App() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full bg-white dark:bg-slate-800 rounded-3xl shadow-xl p-8 text-center border border-slate-100 dark:border-slate-700"
+          className="max-w-md w-full bg-white dark:bg-slate-800 rounded-3xl shadow-xl p-8 border border-slate-100 dark:border-slate-700"
         >
-          <div className="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary-shadow dark:shadow-none">
-            <ShoppingBag className="text-white w-10 h-10" />
+          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary-shadow dark:shadow-none">
+            <ShoppingBag className="text-white w-8 h-8" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">SmartOrder</h1>
-          <p className="text-slate-500 dark:text-slate-400 mb-8">The premium order management app for your small business.</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 text-center">SmartOrder</h1>
+          <p className="text-slate-500 dark:text-slate-400 mb-8 text-center">The premium order management app for your small business.</p>
+          
+          <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl mb-6">
+            <button 
+              onClick={() => setAuthMode('login')}
+              className={`flex-1 py-2 rounded-lg font-semibold transition-all ${authMode === 'login' ? 'bg-white dark:bg-slate-600 text-primary dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+            >
+              Login
+            </button>
+            <button 
+              onClick={() => setAuthMode('signup')}
+              className={`flex-1 py-2 rounded-lg font-semibold transition-all ${authMode === 'signup' ? 'bg-white dark:bg-slate-600 text-primary dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+            >
+              Signup
+            </button>
+          </div>
+
+          <form onSubmit={handleEmailAuth} className="space-y-4 mb-6">
+            {authMode === 'signup' && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Business Name</label>
+                <input 
+                  type="text" 
+                  value={businessNameInput}
+                  onChange={(e) => setBusinessNameInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary outline-none transition-all"
+                  placeholder="Your Business Name"
+                  required
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
+              <input 
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary outline-none transition-all"
+                placeholder="name@example.com"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Password</label>
+              <input 
+                type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary outline-none transition-all"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+            
+            {authError && (
+              <p className="text-red-500 text-sm font-medium">{authError}</p>
+            )}
+
+            <button 
+              type="submit"
+              disabled={authLoading}
+              className="w-full bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-primary-shadow dark:shadow-none disabled:opacity-50"
+            >
+              {authLoading ? 'Processing...' : authMode === 'login' ? 'Login' : 'Create Account'}
+            </button>
+          </form>
+
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400">Or continue with</span>
+            </div>
+          </div>
           
           <button 
             onClick={handleLogin}
-            className="w-full bg-primary hover:bg-primary-hover text-white font-semibold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-3 shadow-lg shadow-primary-shadow dark:shadow-none"
+            disabled={authLoading}
+            className="w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white font-semibold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-3 disabled:opacity-50"
           >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 bg-white rounded-full p-1" alt="Google" />
-            Continue with Google
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google" />
+            Gmail / Google
           </button>
           
-          <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-700 grid grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className="text-primary dark:text-primary-light font-bold text-xl">100%</div>
-              <div className="text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wider font-semibold">Secure</div>
-            </div>
-            <div className="text-center">
-              <div className="text-primary dark:text-primary-light font-bold text-xl">Fast</div>
-              <div className="text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wider font-semibold">Invoicing</div>
-            </div>
-            <div className="text-center">
-              <div className="text-primary dark:text-primary-light font-bold text-xl">Smart</div>
-              <div className="text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wider font-semibold">Reports</div>
-            </div>
-          </div>
+          <p className="mt-8 text-xs text-slate-400 dark:text-slate-500 text-center">
+            By continuing, you agree to our Terms of Service and Privacy Policy.
+          </p>
         </motion.div>
       </div>
     );
@@ -272,9 +427,16 @@ export default function App() {
           <span className="font-bold text-xl text-primary dark:text-primary-light">SmartOrder</span>
         </div>
         <div className="flex items-center gap-3">
-          <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl relative">
+          <button 
+            onClick={handleOpenNotifications}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl relative"
+          >
             <Bell className="w-6 h-6 text-slate-600 dark:text-slate-400" />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute top-2 right-2 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800">
+                {unreadNotificationsCount}
+              </span>
+            )}
           </button>
           <img src={profile?.logoUrl || user.photoURL || ''} className="w-10 h-10 rounded-full border-2 border-primary-light dark:border-slate-700 object-cover" alt="Profile" />
         </div>
@@ -343,6 +505,34 @@ export default function App() {
         </aside>
 
         <main className="flex-1 min-w-0 h-screen overflow-y-auto bg-slate-50 dark:bg-slate-900">
+          {/* Desktop Top Bar */}
+          <header className="hidden lg:flex items-center justify-between px-10 py-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-700 sticky top-0 z-30">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white capitalize">{activeTab}</h2>
+            </div>
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={handleOpenNotifications}
+                className="p-3 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 rounded-2xl border border-slate-100 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all relative"
+              >
+                <Bell className="w-6 h-6" />
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute top-2 right-2 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
+              <div className="h-10 w-[1px] bg-slate-100 dark:bg-slate-700 mx-2"></div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">{profile?.businessName}</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">{user.email}</p>
+                </div>
+                <img src={profile?.logoUrl || user.photoURL || ''} className="w-10 h-10 rounded-xl object-cover border-2 border-primary-light dark:border-slate-700" alt="Profile" />
+              </div>
+            </div>
+          </header>
+
           <div className="max-w-7xl mx-auto p-4 lg:p-10">
             <AnimatePresence mode="wait">
               <motion.div
@@ -407,7 +597,7 @@ export default function App() {
                   />
                 )}
                 {activeTab === 'invoices' && (
-                  <Invoices orders={orders} profile={profile} />
+                  <Invoices orders={orders} customers={customers} profile={profile} />
                 )}
                 {activeTab === 'offers' && (
                   <Offers user={user} />
@@ -457,6 +647,15 @@ export default function App() {
         }}
         user={user}
         editCustomer={editCustomerData}
+      />
+
+      <NotificationPanel 
+        isOpen={isNotificationOpen}
+        onClose={() => setIsNotificationOpen(false)}
+        notifications={notifications}
+        onMarkAsRead={handleMarkAsRead}
+        onDelete={handleDeleteNotification}
+        onClearAll={handleClearAllNotifications}
       />
     </div>
   );

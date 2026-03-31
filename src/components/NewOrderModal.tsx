@@ -1,4 +1,4 @@
-import { Customer, OrderItem, UserProfile } from '../types';
+import { Customer, OrderItem, UserProfile, Notification } from '../types';
 import { 
   X, 
   Plus, 
@@ -158,6 +158,20 @@ export default function NewOrderModal({ isOpen, onClose, onAddCustomer, customer
           unpaidBalance: increment(balance),
           lastOrderDate: new Date().toISOString()
         });
+
+        // Create Notification
+        if (profile?.orderNotifications) {
+          const notificationData: Omit<Notification, 'id'> = {
+            ownerUid: user.uid,
+            title: 'New Order Placed',
+            message: `A new order ${orderNumber} for ${profile.currency} ${total.toLocaleString()} has been placed by ${customer?.name}.`,
+            date: new Date().toISOString(),
+            isRead: false,
+            type: 'order',
+            orderId: docRef.id
+          };
+          await addDoc(collection(db, 'notifications'), notificationData);
+        }
       }
 
       setIsSuccess(true);

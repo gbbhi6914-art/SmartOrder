@@ -63,20 +63,37 @@ service cloud.firestore {
       return hasRequiredFields(['ownerUid', 'name', 'phone']) &&
              data.ownerUid == request.auth.uid &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.phone is string && data.phone.size() > 0 && data.phone.size() < 20;
+             data.phone is string && data.phone.size() > 0 && data.phone.size() < 20 &&
+             (!('address' in data) || (data.address is string && data.address.size() < 200)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 500));
     }
 
     function isValidOrder(data) {
       return hasRequiredFields(['ownerUid', 'customerId', 'orderNumber', 'total']) &&
              data.ownerUid == request.auth.uid &&
-             data.orderNumber is string &&
-             data.total is number && data.total >= 0;
+             data.orderNumber is string && data.orderNumber.size() < 50 &&
+             data.total is number && data.total >= 0 &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 500));
     }
 
     function isValidOffer(data) {
       return hasRequiredFields(['ownerUid', 'title']) &&
              data.ownerUid == request.auth.uid &&
-             data.title is string && data.title.size() > 0 && data.title.size() < 100;
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             (!('description' in data) || (data.description is string && data.description.size() < 500));
+    }
+
+    function isValidNotification(data) {
+      return hasRequiredFields(['ownerUid', 'title', 'message', 'date', 'isRead', 'type']) &&
+             data.ownerUid == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.message is string && data.message.size() > 0 && data.message.size() < 500 &&
+             data.isRead is bool &&
+             data.type in ['order', 'payment', 'system'];
+    }
+
+    function isUnchanged(field) {
+      return !(field in request.resource.data) || request.resource.data[field] == resource.data[field];
     }
 
     // ===============================================================
@@ -91,21 +108,28 @@ service cloud.firestore {
     match /customers/{customerId} {
       allow read: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
       allow create: if isAuthenticated() && isValidCustomer(request.resource.data);
-      allow update: if isDocOwner() && isValidCustomer(request.resource.data);
+      allow update: if isDocOwner() && isValidCustomer(request.resource.data) && isUnchanged('ownerUid');
       allow delete: if isDocOwner();
     }
 
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
       allow create: if isAuthenticated() && isValidOrder(request.resource.data);
-      allow update: if isDocOwner() && isValidOrder(request.resource.data);
+      allow update: if isDocOwner() && isValidOrder(request.resource.data) && isUnchanged('ownerUid');
       allow delete: if isDocOwner();
     }
 
     match /offers/{offerId} {
       allow read: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
       allow create: if isAuthenticated() && isValidOffer(request.resource.data);
-      allow update: if isDocOwner() && isValidOffer(request.resource.data);
+      allow update: if isDocOwner() && isValidOffer(request.resource.data) && isUnchanged('ownerUid');
+      allow delete: if isDocOwner();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
+      allow create: if isAuthenticated() && isValidNotification(request.resource.data);
+      allow update: if isDocOwner() && isValidNotification(request.resource.data) && isUnchanged('ownerUid');
       allow delete: if isDocOwner();
     }
   }
