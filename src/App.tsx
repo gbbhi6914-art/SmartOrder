@@ -81,43 +81,54 @@ export default function App() {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
-      if (firebaseUser) {
-        const profileRef = doc(db, 'users', firebaseUser.uid);
-        const unsubProfile = onSnapshot(profileRef, async (docSnap) => {
-          if (docSnap.exists()) {
-            setProfile(docSnap.data() as UserProfile);
-          } else {
-            const newProfile: UserProfile = {
-              uid: firebaseUser.uid,
-              businessName: firebaseUser.displayName || 'My Business',
-              currency: 'PKR',
-              invoicePrefix: 'INV-',
-              language: 'en',
-              theme: 'light',
-              colorTheme: 'indigo',
-              phone: '',
-              whatsapp: '',
-              address: '',
-              orderNotifications: true,
-              paymentAlerts: true,
-              biometricLock: false
-            };
-            await setDoc(profileRef, newProfile);
-            setProfile(newProfile);
-          }
-          setLoading(false);
-        }, (error) => handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`));
-        return () => unsubProfile();
-      } else {
+      if (!firebaseUser) {
         setProfile(null);
         setLoading(false);
       }
     });
-
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const profileRef = doc(db, 'users', user.uid);
+    const unsubProfile = onSnapshot(profileRef, async (docSnap) => {
+      if (docSnap.exists()) {
+        setProfile(docSnap.data() as UserProfile);
+      } else {
+        const newProfile: UserProfile = {
+          uid: user.uid,
+          businessName: user.displayName || 'My Business',
+          currency: 'PKR',
+          invoicePrefix: 'INV-',
+          language: 'en',
+          theme: 'light',
+          colorTheme: 'indigo',
+          phone: '',
+          whatsapp: '',
+          address: '',
+          orderNotifications: true,
+          paymentAlerts: true,
+          biometricLock: false
+        };
+        try {
+          await setDoc(profileRef, newProfile);
+          setProfile(newProfile);
+        } catch (error) {
+          handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}`);
+        }
+      }
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+      setLoading(false);
+    });
+
+    return () => unsubProfile();
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
