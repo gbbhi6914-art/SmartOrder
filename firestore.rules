@@ -15,6 +15,9 @@ service cloud.firestore {
     //
     // Collection: /offers
     // Fields: id, ownerUid, title, description, discountCode, imageUrl, expiryDate
+    //
+    // Collection: /notifications
+    // Fields: id, ownerUid, title, message, date, isRead, type
     // ===============================================================
 
     // ===============================================================
@@ -46,8 +49,8 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly(fields);
     }
 
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    function isUnchanged(field) {
+      return !(field in request.resource.data) || request.resource.data[field] == resource.data[field];
     }
 
     // ===============================================================
@@ -56,7 +59,10 @@ service cloud.firestore {
     function isValidUser(data) {
       return hasRequiredFields(['uid', 'businessName']) &&
              data.uid == request.auth.uid &&
-             data.businessName is string && data.businessName.size() > 0 && data.businessName.size() < 100;
+             data.businessName is string && data.businessName.size() > 0 && data.businessName.size() < 100 &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() < 20)) &&
+             (!('whatsapp' in data) || (data.whatsapp is string && data.whatsapp.size() < 20)) &&
+             (!('address' in data) || (data.address is string && data.address.size() < 200));
     }
 
     function isValidCustomer(data) {
@@ -92,10 +98,6 @@ service cloud.firestore {
              data.type in ['order', 'payment', 'system'];
     }
 
-    function isUnchanged(field) {
-      return !(field in request.resource.data) || request.resource.data[field] == resource.data[field];
-    }
-
     // ===============================================================
     // Rules
     // ===============================================================
@@ -106,28 +108,32 @@ service cloud.firestore {
     }
 
     match /customers/{customerId} {
-      allow read: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
+      allow get: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
+      allow list: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
       allow create: if isAuthenticated() && isValidCustomer(request.resource.data);
       allow update: if isDocOwner() && isValidCustomer(request.resource.data) && isUnchanged('ownerUid');
       allow delete: if isDocOwner();
     }
 
     match /orders/{orderId} {
-      allow read: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
+      allow get: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
+      allow list: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
       allow create: if isAuthenticated() && isValidOrder(request.resource.data);
       allow update: if isDocOwner() && isValidOrder(request.resource.data) && isUnchanged('ownerUid');
       allow delete: if isDocOwner();
     }
 
     match /offers/{offerId} {
-      allow read: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
+      allow get: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
+      allow list: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
       allow create: if isAuthenticated() && isValidOffer(request.resource.data);
       allow update: if isDocOwner() && isValidOffer(request.resource.data) && isUnchanged('ownerUid');
       allow delete: if isDocOwner();
     }
 
     match /notifications/{notificationId} {
-      allow read: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
+      allow get: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
+      allow list: if isAuthenticated() && (resource == null || resource.data.ownerUid == request.auth.uid);
       allow create: if isAuthenticated() && isValidNotification(request.resource.data);
       allow update: if isDocOwner() && isValidNotification(request.resource.data) && isUnchanged('ownerUid');
       allow delete: if isDocOwner();

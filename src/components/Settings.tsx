@@ -21,7 +21,8 @@ import {
   X,
   Eye,
   EyeOff,
-  Palette
+  Palette,
+  LogOut
 } from 'lucide-react';
 import { useState, useEffect, ChangeEvent } from 'react';
 import { db, doc, updateDoc, handleFirestoreError, OperationType, collection, query, where, getDocs } from '../firebase';
@@ -31,6 +32,7 @@ import { GoogleGenAI } from "@google/genai";
 interface SettingsProps {
   profile: UserProfile | null;
   user: any;
+  onLogout: () => void;
 }
 
 declare global {
@@ -42,7 +44,7 @@ declare global {
   }
 }
 
-export default function SettingsView({ profile, user }: SettingsProps) {
+export default function SettingsView({ profile, user, onLogout }: SettingsProps) {
   const [activeSection, setActiveSection] = useState<'profile' | 'appearance' | 'notifications' | 'security' | 'backup'>('profile');
   const [businessName, setBusinessName] = useState(profile?.businessName || '');
   const [phone, setPhone] = useState(profile?.phone || '');
@@ -321,6 +323,16 @@ export default function SettingsView({ profile, user }: SettingsProps) {
             <Database className="w-5 h-5" />
             Backup & Sync
           </button>
+
+          <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-700">
+            <button 
+              onClick={onLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
+            >
+              <LogOut className="w-5 h-5" />
+              Logout Account
+            </button>
+          </div>
         </div>
 
         {/* Content Area */}
@@ -436,7 +448,14 @@ export default function SettingsView({ profile, user }: SettingsProps) {
                   </div>
                 </div>
 
-                <div className="pt-6 border-t border-slate-50 dark:border-slate-700 flex justify-end">
+                <div className="pt-6 border-t border-slate-50 dark:border-slate-700 flex justify-between items-center">
+                  <button 
+                    onClick={onLogout}
+                    className="flex items-center gap-2 text-rose-500 font-bold hover:underline"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    Logout Account
+                  </button>
                   <button 
                     onClick={handleSave}
                     disabled={saving}

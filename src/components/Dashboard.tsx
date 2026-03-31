@@ -15,7 +15,8 @@ import {
   Repeat,
   Gift,
   Sun,
-  Moon
+  Moon,
+  LogOut
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -27,9 +28,10 @@ interface DashboardProps {
   onAddCustomer: () => void;
   setActiveTab: (tab: Tab) => void;
   toggleTheme: () => void;
+  onLogout: () => void;
 }
 
-export default function Dashboard({ orders, customers, profile, onNewOrder, onAddCustomer, setActiveTab, toggleTheme }: DashboardProps) {
+export default function Dashboard({ orders, customers, profile, onNewOrder, onAddCustomer, setActiveTab, toggleTheme, onLogout }: DashboardProps) {
   const today = new Date().toISOString().split('T')[0];
   const todayOrders = orders.filter(o => o.date.startsWith(today));
   
@@ -58,7 +60,7 @@ export default function Dashboard({ orders, customers, profile, onNewOrder, onAd
     { label: 'Create Invoice', icon: FileText, onClick: () => setActiveTab('invoices'), color: 'bg-blue-600' },
     { label: 'Send WhatsApp', icon: MessageSquare, onClick: () => setActiveTab('customers'), color: 'bg-green-600' },
     { label: 'Add Offer', icon: Gift, onClick: () => setActiveTab('offers'), color: 'bg-rose-600' },
-    { label: 'Search', icon: Search, onClick: () => setActiveTab('orders'), color: 'bg-slate-600' },
+    { label: 'Logout', icon: LogOut, onClick: onLogout, color: 'bg-rose-500' },
   ];
 
   return (

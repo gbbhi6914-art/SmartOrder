@@ -64,10 +64,6 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Auth State
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [businessNameInput, setBusinessNameInput] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   
@@ -112,7 +108,7 @@ export default function App() {
             setProfile(newProfile);
           }
           setLoading(false);
-        });
+        }, (error) => handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`));
         return () => unsubProfile();
       } else {
         setProfile(null);
@@ -170,26 +166,6 @@ export default function App() {
       await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
       console.error("Login error:", error);
-      setAuthError(error.message);
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthLoading(true);
-    setAuthError('');
-    try {
-      if (authMode === 'signup') {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(userCredential.user, { displayName: businessNameInput });
-        // Profile will be created by the onAuthStateChanged effect
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-      }
-    } catch (error: any) {
-      console.error("Auth error:", error);
       setAuthError(error.message);
     } finally {
       setAuthLoading(false);
@@ -309,99 +285,33 @@ export default function App() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full bg-white dark:bg-slate-800 rounded-3xl shadow-xl p-8 border border-slate-100 dark:border-slate-700"
+          className="max-w-md w-full bg-white dark:bg-slate-800 rounded-3xl shadow-xl p-10 border border-slate-100 dark:border-slate-700 text-center"
         >
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary-shadow dark:shadow-none">
-            <ShoppingBag className="text-white w-8 h-8" />
+          <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl shadow-primary-shadow dark:shadow-none">
+            <ShoppingBag className="text-white w-10 h-10" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 text-center">SmartOrder</h1>
-          <p className="text-slate-500 dark:text-slate-400 mb-8 text-center">The premium order management app for your small business.</p>
+          <h1 className="text-4xl font-black text-slate-900 dark:text-white mb-3 tracking-tight">SmartOrder</h1>
+          <p className="text-slate-500 dark:text-slate-400 mb-10 text-lg">The premium order management app for your small business.</p>
           
-          <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl mb-6">
+          <div className="space-y-4">
             <button 
-              onClick={() => setAuthMode('login')}
-              className={`flex-1 py-2 rounded-lg font-semibold transition-all ${authMode === 'login' ? 'bg-white dark:bg-slate-600 text-primary dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+              onClick={handleLogin}
+              disabled={authLoading}
+              className="w-full bg-white dark:bg-slate-700 border-2 border-slate-100 dark:border-slate-600 hover:border-primary dark:hover:border-primary-light text-slate-700 dark:text-white font-bold py-5 px-6 rounded-2xl transition-all flex items-center justify-center gap-4 disabled:opacity-50 shadow-sm"
             >
-              Login
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google" />
+              Sign in with Google
             </button>
-            <button 
-              onClick={() => setAuthMode('signup')}
-              className={`flex-1 py-2 rounded-lg font-semibold transition-all ${authMode === 'signup' ? 'bg-white dark:bg-slate-600 text-primary dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
-            >
-              Signup
-            </button>
-          </div>
 
-          <form onSubmit={handleEmailAuth} className="space-y-4 mb-6">
-            {authMode === 'signup' && (
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Business Name</label>
-                <input 
-                  type="text" 
-                  value={businessNameInput}
-                  onChange={(e) => setBusinessNameInput(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary outline-none transition-all"
-                  placeholder="Your Business Name"
-                  required
-                />
+            {authError && (
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-900/30">
+                <p className="text-red-500 dark:text-red-400 text-sm font-bold">{authError}</p>
               </div>
             )}
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
-              <input 
-                type="email" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary outline-none transition-all"
-                placeholder="name@example.com"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Password</label>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary outline-none transition-all"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-            
-            {authError && (
-              <p className="text-red-500 text-sm font-medium">{authError}</p>
-            )}
-
-            <button 
-              type="submit"
-              disabled={authLoading}
-              className="w-full bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-primary-shadow dark:shadow-none disabled:opacity-50"
-            >
-              {authLoading ? 'Processing...' : authMode === 'login' ? 'Login' : 'Create Account'}
-            </button>
-          </form>
-
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400">Or continue with</span>
-            </div>
           </div>
           
-          <button 
-            onClick={handleLogin}
-            disabled={authLoading}
-            className="w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white font-semibold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google" />
-            Gmail / Google
-          </button>
-          
-          <p className="mt-8 text-xs text-slate-400 dark:text-slate-500 text-center">
-            By continuing, you agree to our Terms of Service and Privacy Policy.
+          <p className="mt-10 text-xs text-slate-400 dark:text-slate-500">
+            By continuing, you agree to our <span className="underline cursor-pointer">Terms of Service</span> and <span className="underline cursor-pointer">Privacy Policy</span>.
           </p>
         </motion.div>
       </div>
@@ -437,6 +347,13 @@ export default function App() {
                 {unreadNotificationsCount}
               </span>
             )}
+          </button>
+          <button 
+            onClick={handleLogout}
+            className="p-2 hover:bg-rose-50 dark:hover:bg-rose-900/20 text-rose-500 rounded-xl transition-colors"
+            title="Logout"
+          >
+            <LogOut className="w-6 h-6" />
           </button>
           <img src={profile?.logoUrl || user.photoURL || ''} className="w-10 h-10 rounded-full border-2 border-primary-light dark:border-slate-700 object-cover" alt="Profile" />
         </div>
@@ -522,6 +439,13 @@ export default function App() {
                   </span>
                 )}
               </button>
+              <button 
+                onClick={handleLogout}
+                className="p-3 bg-rose-50 dark:bg-rose-900/20 text-rose-500 rounded-2xl border border-rose-100 dark:border-rose-900/30 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all flex items-center gap-2 font-bold text-sm"
+              >
+                <LogOut className="w-5 h-5" />
+                Logout
+              </button>
               <div className="h-10 w-[1px] bg-slate-100 dark:bg-slate-700 mx-2"></div>
               <div className="flex items-center gap-3">
                 <div className="text-right">
@@ -558,6 +482,7 @@ export default function App() {
                     }}
                     setActiveTab={setActiveTab}
                     toggleTheme={toggleTheme}
+                    onLogout={handleLogout}
                   />
                 )}
                 {activeTab === 'orders' && (
@@ -603,7 +528,7 @@ export default function App() {
                   <Offers user={user} />
                 )}
                 {activeTab === 'settings' && (
-                  <SettingsView profile={profile} user={user} />
+                  <SettingsView profile={profile} user={user} onLogout={handleLogout} />
                 )}
               </motion.div>
             </AnimatePresence>
